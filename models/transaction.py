@@ -3,9 +3,9 @@ from typing import Literal
 from datetime import datetime
 
 class TransactionBase(BaseModel):
+  category: str
   amount: condecimal(max_digits=10, decimal_places=2)
-  type: Literal["Entrada", "Saída"]  # Tipo de transação: receita ou despesa
-  description: str
+  transaction_type: Literal["Entrada", "Saída"]
 
 class TransactionRequest(TransactionBase):
   user_id: int  # ID do usuário que fez a transação

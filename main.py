@@ -12,9 +12,9 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-app.include_router(user_router)
-app.include_router(transaction_router)
-app.include_router(budget_router)
+app.include_router(user_router, prefix="/api")
+app.include_router(transaction_router, prefix="/api")
+app.include_router(budget_router, prefix="/api")
 
 @app.get("/")
 def root():

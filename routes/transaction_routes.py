@@ -9,33 +9,46 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
 @router.post("/", response_model=TransactionResponse)
 def create_transaction(transaction_data: TransactionRequest, db: Session = Depends(db_session)):
-  transaction = Transaction(**transaction_data.dict())
-  return TransactionRepository.save(db, transaction)
+  transaction = TransactionRepository.save(db, Transaction(**transaction_data.dict()))
+  return TransactionResponse.model_validate(transaction)
 
-@router.get("/{transaction_id}", response_model=TransactionResponse)
-def get_transaction(transaction_id: int, db: Session = Depends(db_session)):
-  transaction = TransactionRepository.find_by_id(db, transaction_id)
+@router.get("/{id}", response_model=TransactionResponse)
+def get_transaction(id: int, db: Session = Depends(db_session)):
+  transaction = TransactionRepository.find_by_id(db, id)
+
   if not transaction:
     raise HTTPException(status_code=404, detail="Operação não encontrada")
-  return transaction
+
+  return TransactionResponse.model_validate(transaction)
 
 @router.get("/", response_model=list[TransactionResponse])
 def list_transactions(db: Session = Depends(db_session)):
-  return TransactionRepository.get_all(db)
+  transactions = TransactionRepository.get_all(db)
+  return [TransactionResponse.model_validate(transaction) for transaction in transactions]
 
-@router.delete("/{transaction_id}")
-def delete_transaction(transaction_id: int, db: Session = Depends(db_session)):
-  transaction = TransactionRepository.find_by_id(db, transaction_id)
+@router.delete("/{id}")
+def delete_transaction(id: int, db: Session = Depends(db_session)):
+  transaction = TransactionRepository.is_transaction_exists(db, id)
+
   if not transaction:
     raise HTTPException(status_code=404, detail="Operação não encontrada")
-  TransactionRepository.delete_by_id(db, transaction_id)
+
+  TransactionRepository.delete_by_id(db, id)
   return {"message": "Operação removida com sucesso"}
 
-@router.put("/{transaction_id}", response_model=TransactionResponse)
+@router.put("/{id}", response_model=TransactionResponse)
 def update(id: int, request: TransactionRequest, db: Session = Depends(db_session)):
-  if not TransactionRepository.is_transaction_exists(db, id):
+  transaction = TransactionRepository.find_by_id(db, id)
+
+  if not transaction:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND, detail="Operação não encontrado"
     )
-  transaction = TransactionRepository.save(db, Transaction(id=id, **request.dict()))
-  return TransactionResponse.from_orm(transaction)
+
+  update_data = request.model_dump(exclude_unset=True)
+
+  for key, value in update_data.items():
+    setattr(transaction, key, value)
+
+  transaction = TransactionRepository.save(db, transaction)
+  return TransactionResponse.model_validate(transaction)

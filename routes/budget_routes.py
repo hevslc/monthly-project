@@ -9,33 +9,45 @@ router = APIRouter(prefix="/budgets", tags=["Budgets"])
 
 @router.post("/", response_model=BudgetResponse)
 def create_budget(budget_data: BudgetRequest, db: Session = Depends(db_session)):
-  budget = Budget(**budget_data.dict())
-  return BudgetRepository.save(db, budget)
+  budget = BudgetRepository.save(db, Budget(**budget_data.dict()))
+  return BudgetResponse.model_validate(budget)
 
-@router.get("/{budget_id}", response_model=BudgetResponse)
-def get_budget(budget_id: int, db: Session = Depends(db_session)):
-  budget = BudgetRepository.find_by_id(db, budget_id)
+@router.get("/{id}", response_model=BudgetResponse)
+def get_budget(id: int, db: Session = Depends(db_session)):
+  budget = BudgetRepository.find_by_id(db, id)
+
   if not budget:
     raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-  return budget
+  return BudgetResponse.model_validate(budget)
 
 @router.get("/", response_model=list[BudgetResponse])
 def list_budgets(db: Session = Depends(db_session)):
-  return BudgetRepository.get_all(db)
+  budgets = BudgetRepository.get_all(db)
+  return [BudgetResponse.model_validate(budget) for budget in budgets]
 
-@router.delete("/{budget_id}")
-def delete_budget(budget_id: int, db: Session = Depends(db_session)):
-  budget = BudgetRepository.find_by_id(db, budget_id)
+@router.delete("/{id}")
+def delete_budget(id: int, db: Session = Depends(db_session)):
+  budget = BudgetRepository.is_budget_exists(db, id)
+
   if not budget:
     raise HTTPException(status_code=404, detail="Orçamento não encontrado")
-  BudgetRepository.delete_by_id(db, budget_id)
+
+  BudgetRepository.delete_by_id(db, id)
   return {"message": "Orçamento removido com sucesso"}
 
-@router.put("/{budget_id}", response_model=BudgetResponse)
+@router.put("/{id}", response_model=BudgetResponse)
 def update(id: int, request: BudgetRequest, db: Session = Depends(db_session)):
-  if not BudgetRepository.is_budget_exists(db, id):
+  budget = BudgetRepository.find_by_id(db, id)
+
+  if not budget:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND, detail="Orçamento não encontrado"
     )
-  budget = BudgetRepository.save(db, Budget(id=id, **request.dict()))
-  return BudgetResponse.from_orm(budget)
+  
+  update_data = request.model_dump(exclude_unset=True)
+
+  for key, value in update_data.items():
+    setattr(budget, key, value)
+
+  budget = BudgetRepository.save(db, budget)
+  return BudgetResponse.model_validate(budget)
